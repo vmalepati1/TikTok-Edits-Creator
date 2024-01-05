@@ -6,6 +6,7 @@ import pyktok as pyk
 from moviepy.editor import VideoFileClip
 import re
 import librosa
+import matplotlib.pyplot as plt
 
 audio_tiktok_link = 'https://www.tiktok.com/@glintsfx/video/7296966811646430506?q=edits&t=1704346855251'
 ##
@@ -34,4 +35,14 @@ sampling_rate = video_clip.audio.fps
 
 print(f'Sampling Rate: {sampling_rate} Hz')
 
+# Collapse stereo audio array into a mono audio array with 1 channel
+mono_audio = np.mean(audio_array, axis=1)
 
+X = librosa.stft(mono_audio)
+X_db = librosa.amplitude_to_db(abs(X))
+
+# Draw spectogram
+plt.figure(figsize = (10, 5))
+librosa.display.specshow(X_db, sr = sampling_rate, x_axis = 'time', y_axis = 'hz')
+plt.colorbar(format='%+2.0f dB')
+plt.show()
