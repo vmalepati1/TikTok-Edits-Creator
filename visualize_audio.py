@@ -9,9 +9,16 @@ import librosa
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import sklearn.preprocessing
+from pydub import AudioSegment
+from pydub.playback import play
 
 def normalize(x, axis = 0):
   return sklearn.preprocessing.minmax_scale(x, axis = axis)
+
+def update_line(num, line, centroids, frames, sampling_rate):
+    line.set_xdata([frames[num], frames[num]])  # Update x-coordinate based on time
+    line.set_ydata(centroids[:, num])
+    return line,
 
 audio_tiktok_link = 'https://www.tiktok.com/@glintsfx/video/7296966811646430506?q=edits&t=1704346855251'
 ##
@@ -45,14 +52,6 @@ mono_audio = np.mean(audio_array, axis=1)
 
 print(f'Mono audio shape: {mono_audio.shape}')
 
-X = librosa.stft(mono_audio)
-X_db = librosa.amplitude_to_db(abs(X))
-
-# Plot spectogram
-plt.figure(figsize=(10, 5))
-librosa.display.specshow(X_db, sr = sampling_rate, x_axis = 'time', y_axis = 'hz')
-plt.colorbar(format='%+2.0f dB')
-
 # Compute spectral centoids (average frequency at each time)
 spectral_centroids = librosa.feature.spectral_centroid(y=mono_audio, sr=sampling_rate)[0]
 print(f'Spectral centroids audio shape: {spectral_centroids.shape}')
@@ -67,40 +66,32 @@ librosa.display.waveshow(mono_audio, sr = sampling_rate, alpha = 0.4)
 
 normalized_centroids = normalize(spectral_centroids)
 
-plt.plot(t, normalized_centroids, color = 'b')
+# Plot spectral centroids as a blue line
+plt.plot(t, normalized_centroids, color='b')
+
+# Initialize the red line at time 0
+red_line, = plt.plot([0, 0], [0, 1], color='r', lw=2)
+
+# Set plot properties
 plt.title('Waveform with Spectral Centroids')
 plt.xlabel('Time (s)')
 plt.ylabel('Amplitude / Spectral Centroids')
+
+# Convert the numpy array to an AudioSegment
+audio_array = (mono_audio * (2**15 - 1)).astype(np.int16)
+audio_segment = AudioSegment(audio_array.tobytes(), frame_rate=sampling_rate, sample_width=audio_array.dtype.itemsize, channels=1)
+
+# Play the audio
+play(audio_segment)
+
+### Create an animation to update the red line position
+##ani = animation.FuncAnimation(
+##    plt.gcf(),
+##    update_line,
+##    len(frames),
+##    fargs=(red_line, normalized_centroids, frames, sampling_rate),
+##    interval=sampling_rate / len(frames) * 1000,  # Interval in milliseconds
+##    blit=True
+##)
+
 plt.show()
-
-# Percentile within which frequencies this low are considered beat drops
-##beat_drop_centroid_thresh = 5
-##
-##threshold = np.percentile(spectral_centroids, beat_drop_centroid_thresh)
-##
-##beat_drop_indices = np.where(spectral_centroids < threshold)[0]
-##
-##beat_drop_timestamps = librosa.frames_to_time(beat_drop_indices, sr=sampling_rate)
-##
-##print(beat_drop_timestamps)
-
-derivative = np.gradient(spectral_centroids)
-
-# smoothed_derivative = scipy.signal.savgol_filter(derivative, window_length=5, polyorder=2)
-
-second_derivative = np.gradient(derivative)
-
-##for i in range(0, derivative.size - 1):
-##    left = derivative[i]
-##    right = derivative[i + 1]
-##    d2y = second_derivative[i]
-##
-##    if left < 0 and right > 0 and d2y > 0:
-##        print(left)
-    
-minima_indices = np.where((derivative[:-1] < 0) & (derivative[1:] >= 0) & (second_derivative[:-1] > 0))[0]
-
-# Convert indices to timestamps
-minima_timestamps = librosa.frames_to_time(minima_indices, sr=sampling_rate)
-
-print("Relative Minima Timestamps:", minima_timestamps)
